@@ -1,6 +1,8 @@
 package com.kritish.aahvaan;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.support.annotation.MainThread;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
@@ -44,16 +46,6 @@ public class LoginActivity extends AppCompatActivity {
                 .requestEmail()
                 .build();
 
-        gSignInButton = (SignInButton) findViewById(R.id.button_signin);
-        gSignInButton.setSize(SignInButton.SIZE_STANDARD);
-        gSignInButton.setScopes(gso.getScopeArray());
-        gSignInButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                signIn();
-            }
-        });
-
         mAuth = FirebaseAuth.getInstance();
         mAuthListener = new FirebaseAuth.AuthStateListener() {
             @Override
@@ -76,6 +68,16 @@ public class LoginActivity extends AppCompatActivity {
                 })
                 .addApi(Auth.GOOGLE_SIGN_IN_API, gso)
                 .build();
+
+        gSignInButton = (SignInButton) findViewById(R.id.button_signin);
+        gSignInButton.setSize(SignInButton.SIZE_STANDARD);
+        gSignInButton.setScopes(gso.getScopeArray());
+        gSignInButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                signIn();
+            }
+        });
     }
 
     private void signIn() {
@@ -86,35 +88,42 @@ public class LoginActivity extends AppCompatActivity {
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-
         if (requestCode == RC_SIGN_IN) {
             GoogleSignInResult result = Auth.GoogleSignInApi.getSignInResultFromIntent(data);
             if (result.isSuccess()) {
                 GoogleSignInAccount account = result.getSignInAccount();
                 firebaseAuthWithGoogle(account);
             } else {
-                Toast.makeText(LoginActivity.this, "Failed to Signin", Toast.LENGTH_LONG).show();
+                Toast.makeText(LoginActivity.this, "Failed to Sign In", Toast.LENGTH_LONG).show();
             }
         }
     }
 
-    private void firebaseAuthWithGoogle(GoogleSignInAccount acct) {
-        Log.d(TAG, "firebaseAuthWithGoogle:" + acct.getId());
-
+    private void firebaseAuthWithGoogle(final GoogleSignInAccount acct) {
         AuthCredential credential = GoogleAuthProvider.getCredential(acct.getIdToken(), null);
-        mAuth.signInWithCredential(credential)
-                .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
-                    @Override
-                    public void onComplete(@NonNull Task<AuthResult> task) {
-                        Log.d(TAG, "signInWithCredential:onComplete:" + task.isSuccessful());
-                        if (!task.isSuccessful()) {
-                            Toast.makeText(LoginActivity.this, "Authentication failed.",
-                                    Toast.LENGTH_SHORT).show();
-                        }
-                    }
-                });
-    }
+        mAuth.signInWithCredential(credential).addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+            @Override
+            public void onComplete(@NonNull Task<AuthResult> task) {
+                Log.d(TAG, "signInWithCredential:onComplete:" + task.isSuccessful());
+                if (task.isSuccessful()) {
 
+                    SharedPreferences preferences = getSharedPreferences("loginstate", MODE_PRIVATE);
+                    SharedPreferences.Editor editor = preferences.edit();
+                    editor.clear();
+                    editor.putBoolean("isLoggedIn", true);
+                    editor.apply();
+
+                    Toast.makeText(LoginActivity.this, acct.getEmail(), Toast.LENGTH_SHORT).show();
+
+                    startActivity(new Intent(LoginActivity.this, MainActivity.class));
+                    finish();
+
+                } else {
+                    Toast.makeText(LoginActivity.this, "Authentication failed.", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+    }
 
     @Override
     public void onStart() {
